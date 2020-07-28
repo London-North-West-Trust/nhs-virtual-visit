@@ -1,7 +1,13 @@
 const { cleanupScheduledCalls } = require("./cleanup_scheduled_calls");
 import AppContainer from "../../src/containers/AppContainer";
 import moment from "moment";
-import { setupTrust } from "../../src/testUtils/factories";
+import {
+  setupTrust,
+  setupHospital,
+  setupWard,
+  setupVisit,
+} from "../../src/testUtils/factories";
+import { COMPLETE } from "../../src/helpers/visitStatus";
 
 describe("test cleanup script", () => {
   it("updates visit states and data correctly", async () => {
@@ -9,79 +15,86 @@ describe("test cleanup script", () => {
 
     const { trustId } = await setupTrust();
 
-    const { hospitalId } = await container.getCreateHospital()({
-      name: "Test Hospital",
-      trustId: trustId,
-    });
+    const { hospitalId } = await setupHospital({ trustId: trustId });
 
-    const { wardId } = await container.getCreateWard()({
-      name: "Test Ward 1",
+    const { wardId } = await setupWard({
       code: "wardCode1",
       hospitalId: hospitalId,
       trustId: trustId,
     });
 
-    await container.getCreateVisit()({
-      patientName: "Bob Smith",
-      contactEmail: "bob.smith@madetech.com",
-      contactName: "John Smith",
-      contactNumber: "07123456789",
+    // Scheduled visit
+    await setupVisit({
       callTime: moment(),
       callId: "1",
-      provider: "jitsi",
       wardId: wardId,
-      callPassword: "securePassword",
     });
+    //
 
-    const { id: pastVisitId } = await container.getCreateVisit()({
-      patientName: "Bob Smith",
-      contactEmail: "bob.smith@madetech.com",
-      contactName: "John Smith",
-      contactNumber: "07123456789",
+    // Scheduled visit in the past
+    const { id: pastVisitId } = await setupVisit({
       callTime: moment().subtract(5, "days"),
       callId: "2",
-      provider: "jitsi",
       wardId: wardId,
-      callPassword: "securePassword",
     });
+    //
 
-    await container.getCreateVisit()({
-      patientName: "Bob Smith",
-      contactEmail: "bob.smith@madetech.com",
-      contactName: "John Smith",
-      contactNumber: "07123456789",
+    // Deleted visit
+    await setupVisit({
       callTime: moment(),
       callId: "3",
-      provider: "jitsi",
       wardId: wardId,
-      callPassword: "securePassword",
     });
 
     await container.getDeleteVisitByCallId()("3");
+    //
 
-    const { wardId: archiveWardId } = await container.getCreateWard()({
-      name: "Test Ward 2",
+    // Archived visit
+    const { wardId: archiveWardId } = await setupWard({
       code: "wardCode2",
       hospitalId: hospitalId,
       trustId: trustId,
     });
 
-    await container.getCreateVisit()({
-      patientName: "Bob Smith",
-      contactEmail: "bob.smith@madetech.com",
-      contactName: "John Smith",
-      contactNumber: "07123456789",
+    await setupVisit({
       callTime: moment(),
       callId: "4",
-      provider: "jitsi",
       wardId: archiveWardId,
-      callPassword: "securePassword",
     });
 
     await container.getArchiveWard()(archiveWardId, trustId);
+    //
+
+    // Completed visit
+    const { id: completeVisitId } = await setupVisit({
+      callTime: moment(),
+      callId: "5",
+      wardId: wardId,
+      status: COMPLETE,
+    });
+
+    await container.getMarkVisitAsComplete()({
+      id: completeVisitId,
+      wardId: wardId,
+    });
+    //
+
+    // Completed visit in the past
+    const { id: pastCompleteVisitId } = await setupVisit({
+      callTime: moment().subtract(5, "days"),
+      callId: "6",
+      wardId: wardId,
+      status: COMPLETE,
+    });
+
+    await container.getMarkVisitAsComplete()({
+      id: pastCompleteVisitId,
+      wardId: wardId,
+    });
+    //
 
     const res = await cleanupScheduledCalls();
-    expect(res).toEqual({ archived: 1, cancelled: 1, completed: 1 });
+    expect(res).toEqual({ archived: 1, cancelled: 1, completed: 2 });
 
     // future visit still scheduled and can be retrieved
     const futureVisit = await container.getRetrieveVisitByCallId()("1");
@@ -106,10 +119,24 @@ describe("test cleanup script", () => {
     const archivedVisit = await container.getRetrieveVisitByCallId()("4");
     expect(archivedVisit.scheduledCall).toBeNull();
 
-    // Only the future visit is retrieved when retrieving all visits
+    // present complete visit can still be retrieved
+    const completeVisit = await container.getRetrieveVisitById()({
+      id: completeVisitId,
+      wardId: wardId,
+    });
+    expect(completeVisit.error).toBeNull();
+
+    // past complete visit cannot be retrieved
+    const pastCompleteVisit = await container.getRetrieveVisitById()({
+      id: pastCompleteVisitId,
+      wardId: wardId,
+    });
+    expect(pastCompleteVisit.scheduledCall).toBeNull();
+
+    // Only the future visit and complete visit are retrieved when retrieving all visits
     const { scheduledCalls: visits } = await container.getRetrieveVisits()({
       wardId,
     });
-    expect(visits.map((visit) => visit.callId)).toEqual(["1"]);
+    expect(visits.map((visit) => visit.callId)).toEqual(["1", "5"]);
   });
 });
