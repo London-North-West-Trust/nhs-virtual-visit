@@ -2,12 +2,12 @@ version: 2.1
 
 orbs:
   node: circleci/node@1.1.6
-  cypress: cypress-io/cypress@1.16.1
+  cypress: cypress-io/cypress@1
 
 executors:
   pg-cypress:
     docker:
-      - image: cypress/base:12.16.1
+      - image: cypress/base:12
       - image: "circleci/postgres:12.2"
         environment:
           POSTGRES_USER: root
