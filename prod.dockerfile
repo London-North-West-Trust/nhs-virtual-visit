@@ -2,13 +2,14 @@ FROM node:12.16
 WORKDIR /usr/src/app
 
 COPY package*.json ./
-RUN npm install
+RUN yarn install
 
 COPY . .
-RUN npm run test
+RUN yarn test
+
 #RUN yarn test:contract
-RUN npm run build
+RUN yarn build
 
 # part of me wants to run unit and contract tests here
 EXPOSE 3000 3001
-CMD [ "npm", "run", "dev" ]
+CMD [ "yarn", "start" ]
