@@ -20,6 +20,7 @@
     "test:ci": "npm run format:check && npm run test:contract -- --runInBand && npm run test -- --runInBand",
     "test:migrate": "npm run dbmigratetest reset && npm run dbmigratetest up && npm run db:seed",
     "test:e2e2:open": "npm run test:e2e:open",
+    "test:migration": "jest --config ./jest.migrations.config.js --runInBand",
     "build": "next build",
     "dev": "NODE_ENV=development node server.js",
     "start": "NODE_ENV=production node server.js",
@@ -27,7 +28,8 @@
     "db:seed": "node db/scripts/seed_database.js",
     "dbmigrate": "db-migrate --migrations-dir 'db/migrations/'",
     "dbmigratetest": "db-migrate --migrations-dir 'db/migrations/' -e test",
-    "dbmigratedry": "db-migrate --dry-run --migrations-dir 'db/migrations/'"
+    "dbmigratedry": "db-migrate --dry-run --migrations-dir 'db/migrations/'",
+    "postinstall": "test -n \"$NONPMPOSTINSTALL\" || npm run build"
   },
   "dependencies": {
     "@sentry/browser": "^5.15.5",
@@ -71,7 +73,7 @@
   },
   "devDependencies": {
     "babel-eslint": "^10.1.0",
-    "cypress": "^5.4.0",
+    "cypress": "^5.6.0",
     "cypress-audit": "^0.2.3",
     "eslint": "^7.11.0",
     "eslint-plugin-cypress": "^2.11.1",
